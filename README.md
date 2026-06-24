@@ -41,7 +41,7 @@ Go to your repo → **Settings → Secrets and variables → Actions → New rep
 
 | Secret name | Value |
 |---|---|
-| `FROM_EMAIL` | Your Gmail address (e.g. `leslie@gmail.com`) |
+| `FROM_EMAIL` | Your Gmail address (e.g. `myName@gmail.com`) |
 | `TO_EMAIL` | Where to send digests (can be same address) |
 | `GMAIL_APP_PASSWORD` | The 16-char app password from Step 2 |
 | `SERPER_API_KEY` | Serper key from Step 3 (optional) |
