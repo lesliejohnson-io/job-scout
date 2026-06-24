@@ -37,8 +37,7 @@ SENIORITY = [
 ]
 DOMAIN = [
     "design", "ux", "user experience", "product design",
-    "ai product", "human-centered", "hci", "product manager",
-    "product management",
+    "ai product", "human-centered", "hci",
 ]
 
 # Any of these in the title = instant match (no seniority check needed).
@@ -46,8 +45,6 @@ EXACT_PHRASES = [
     "director of design", "head of design", "vp design", "vp of design",
     "chief design officer", "director of product design",
     "head of product design", "director of ux", "head of ux",
-    "director of product", "head of product", "vp of product",
-    "chief product officer",
 ]
 
 # Any of these in the title = hard exclude.
@@ -162,12 +159,18 @@ def scrape_ashby(slug: str, name: str) -> list[dict]:
 # ── Web search discovery (finds companies not in your list) ───────────────────
 
 DISCOVERY_QUERIES = [
+    # ATS platforms — existing companies + unknown ones
     'site:greenhouse.io "director" "design" "health"',
     'site:greenhouse.io "head of design" OR "vp design" health',
     'site:lever.co "director" "design" health',
     'site:lever.co "head of design" OR "vp of design"',
     'site:ashbyhq.com "director" "design" health',
     'site:ashbyhq.com "head of design" OR "vp design"',
+    # Wellfound (startup-first, posts before LinkedIn)
+    'site:wellfound.com "director" "design" health',
+    'site:wellfound.com "head of design" OR "vp design" startup',
+    'site:wellfound.com "senior product designer" health AI',
+    # Broad discovery
     '"director of design" "digital health" job posting 2025',
     '"head of design" "AI" "product" job 2025',
 ]
@@ -178,6 +181,7 @@ def _company_from_url(url: str) -> str:
         r"greenhouse\.io/([^/?#]+)",
         r"lever\.co/([^/?#]+)",
         r"ashbyhq\.com/([^/?#]+)",
+        r"wellfound\.com/company/([^/?#]+)",
     ]:
         m = re.search(pattern, url)
         if m:
@@ -213,6 +217,85 @@ def search_web_discovery(serper_key: str) -> list[dict]:
     return found
 
 
+def scrape_yc_jobs() -> list[dict]:
+    """
+    Scrape YC Work at a Startup — health + AI design roles.
+    YC-backed companies post here first; strong signal for well-funded startups.
+
+    Parses the __NEXT_DATA__ JSON that Next.js embeds in the page HTML.
+    Falls back gracefully if the page structure changes.
+    """
+    import json as _json
+
+    searches = [
+        "https://www.workatastartup.com/jobs?q=product+designer&industry=Healthcare",
+        "https://www.workatastartup.com/jobs?q=ux+designer&industry=Healthcare",
+        "https://www.workatastartup.com/jobs?q=director+design",
+    ]
+
+    jobs = []
+    seen_ids: set[str] = set()
+
+    for url in searches:
+        try:
+            r = requests.get(
+                url,
+                timeout=15,
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/124.0.0.0 Safari/537.36"
+                    ),
+                    "Accept": "text/html,application/xhtml+xml",
+                },
+            )
+            r.raise_for_status()
+
+            # Extract __NEXT_DATA__ JSON blob embedded by Next.js
+            m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(\{.*?\})</script>', r.text, re.DOTALL)
+            if not m:
+                print(f"  [WARN] YC: no __NEXT_DATA__ found at {url}")
+                continue
+
+            data = _json.loads(m.group(1))
+            # Path varies by Next.js version — try both common structures
+            postings = (
+                data.get("props", {}).get("pageProps", {}).get("jobPostings")
+                or data.get("props", {}).get("pageProps", {}).get("jobs")
+                or []
+            )
+
+            for j in postings:
+                job_id = f"yc_{j.get('id', abs(hash(str(j))) % 10**9)}"
+                if job_id in seen_ids:
+                    continue
+                seen_ids.add(job_id)
+
+                company = (j.get("company") or {}).get("name", "") or j.get("companyName", "")
+                location = j.get("locationDescription") or j.get("location") or ""
+                if j.get("remote"):
+                    location = location or "Remote"
+
+                jobs.append({
+                    "id": job_id,
+                    "title": j.get("title", ""),
+                    "company": company,
+                    "location": location,
+                    "url": j.get("url") or f"https://www.workatastartup.com/jobs/{j.get('id', '')}",
+                    "posted_at": j.get("createdAt", ""),
+                    "source": "yc",
+                })
+
+            time.sleep(0.5)
+
+        except Exception as e:
+            print(f"  [WARN] YC scrape failed for {url}: {e}")
+
+    print(f"  {'YC Work at a Startup':30s} {len(jobs):>3} jobs")
+    return jobs
+
+
 # ── State management ──────────────────────────────────────────────────────────
 
 def load_seen() -> set[str]:
@@ -233,6 +316,7 @@ SOURCE_LABELS = {
     "lever": ("⚙️", "Lever"),
     "ashby": ("🔷", "Ashby"),
     "web_discovery": ("🌐", "Web"),
+    "yc": ("🚀", "YC Startup"),
 }
 
 HTML_TEMPLATE = """\
@@ -262,6 +346,7 @@ HTML_TEMPLATE = """\
   .lv {{ background: #dbeafe; color: #1e40af; }}
   .ash {{ background: #ede9fe; color: #5b21b6; }}
   .web {{ background: #fef9c3; color: #854d0e; }}
+  .yc {{ background: #fee2e2; color: #991b1b; }}
   .empty {{ color: #888; font-size: 14px; padding: 16px 0; }}
   .footer {{ margin-top: 28px; font-size: 12px; color: #aaa; border-top: 1px solid #eee; padding-top: 14px; }}
 </style>
@@ -272,15 +357,15 @@ HTML_TEMPLATE = """\
   <p class="sub">{count} new match{plural} · scraped directly from ATS pages (24–72 hrs ahead of LinkedIn)</p>
   {body}
   <div class="footer">
-    Sources: Greenhouse · Lever · Ashby · Web discovery via Serper<br>
-    Filters: Director / Head of / VP / Principal · Design, UX, Product Design, AI Product · Digital Health
+    Sources: Greenhouse · Lever · Ashby · Wellfound · YC Work at a Startup · Web discovery via Serper<br>
+    Filters: Director / Head of / VP / Principal / Senior · Design, UX, Product Design, AI Product
   </div>
 </div>
 </body>
 </html>
 """
 
-BADGE_CLASS = {"greenhouse": "gh", "lever": "lv", "ashby": "ash", "web_discovery": "web"}
+BADGE_CLASS = {"greenhouse": "gh", "lever": "lv", "ashby": "ash", "web_discovery": "web", "yc": "yc"}
 
 
 def build_email_html(new_jobs: list[dict]) -> str:
@@ -358,6 +443,9 @@ def main(dry_run: bool = False) -> None:
         web = search_web_discovery(serper_key)
         print(f"  {'Web discovery':30s} {len(web):>3} results")
         all_jobs.extend(web)
+
+    yc_jobs = scrape_yc_jobs()
+    all_jobs.extend(yc_jobs)
 
     relevant  = [j for j in all_jobs if is_relevant(j)]
     new_jobs  = [j for j in relevant if j["id"] not in seen]
