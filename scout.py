@@ -186,6 +186,7 @@ DISCOVERY_QUERIES = [
     '"senior product designer" "mental health" OR "wellness" job 2026',
     '"first design hire" OR "founding designer" job 2026',
     '"operator experience" OR "human-machine interface" designer job 2026',
+    '"senior product designer" remote robotics OR "mental health" 2026',
 ]
 
 
