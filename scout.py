@@ -32,8 +32,8 @@ SEEN_JOBS_FILE = ROOT / "data" / "seen_jobs.json"
 
 # At least one from each list must appear in the job title.
 SENIORITY = [
-    "director", "head of", "vp ", "vp,", "vice president",
-    "principal", "senior", "sr.", "lead",
+    "senior", "sr.", "director", "head of", "vp ", "vp,", "vice president",
+    "principal", "lead",
 ]
 DOMAIN = [
     "design", "ux", "user experience", "product design",
@@ -42,9 +42,9 @@ DOMAIN = [
 
 # Any of these in the title = instant match (no seniority check needed).
 EXACT_PHRASES = [
-    "director of design", "head of design", "vp design", "vp of design",
-    "chief design officer", "director of product design",
-    "head of product design", "director of ux", "head of ux",
+    "founding designer", "first designer", "design lead",
+    "product designer, robotics", "senior product designer",
+    "staff product designer", "principal product designer",
 ]
 
 # Any of these in the title = hard exclude.
@@ -159,20 +159,33 @@ def scrape_ashby(slug: str, name: str) -> list[dict]:
 # ── Web search discovery (finds companies not in your list) ───────────────────
 
 DISCOVERY_QUERIES = [
-    # ATS platforms — existing companies + unknown ones
-    'site:greenhouse.io "director" "design" "health"',
-    'site:greenhouse.io "head of design" OR "vp design" health',
-    'site:lever.co "director" "design" health',
-    'site:lever.co "head of design" OR "vp of design"',
-    'site:ashbyhq.com "director" "design" health',
-    'site:ashbyhq.com "head of design" OR "vp design"',
-    # Wellfound (startup-first, posts before LinkedIn)
-    'site:wellfound.com "director" "design" health',
-    'site:wellfound.com "head of design" OR "vp design" startup',
-    'site:wellfound.com "senior product designer" health AI',
-    # Broad discovery
-    '"director of design" "digital health" job posting 2025',
-    '"head of design" "AI" "product" job 2025',
+    # ── ATS platforms: robotics / physical AI ──
+    'site:greenhouse.io "senior product designer" robotics',
+    'site:greenhouse.io "product designer" "robotics" OR "autonomous" OR "drone"',
+    'site:lever.co "senior product designer" robotics OR "physical AI"',
+    'site:ashbyhq.com "product designer" robotics OR autonomy',
+    'site:greenhouse.io "founding designer" OR "first designer" robotics',
+
+    # ── ATS platforms: mental health / wellness / fitness ──
+    'site:greenhouse.io "senior product designer" "mental health" OR wellness',
+    'site:lever.co "senior product designer" "mental health" OR therapy',
+    'site:ashbyhq.com "senior product designer" health OR wellness',
+    'site:greenhouse.io "product designer" fitness OR "health and fitness"',
+
+    # ── ATS platforms: leadership tier (kept from original, de-healthed) ──
+    'site:greenhouse.io "head of design" OR "design lead" robotics OR health',
+    'site:lever.co "director" "design" robotics OR "mental health"',
+
+    # ── Wellfound (startup-first, posts before LinkedIn) ──
+    'site:wellfound.com "senior product designer" robotics OR "physical AI"',
+    'site:wellfound.com "senior product designer" "mental health" OR wellness',
+    'site:wellfound.com "founding designer" OR "design lead" AI',
+
+    # ── Broad discovery ──
+    '"senior product designer" "robotics" OR "physical AI" job posting 2026',
+    '"senior product designer" "mental health" OR "wellness" job 2026',
+    '"first design hire" OR "founding designer" job 2026',
+    '"operator experience" OR "human-machine interface" designer job 2026',
 ]
 
 
