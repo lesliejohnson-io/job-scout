@@ -32,8 +32,7 @@ SEEN_JOBS_FILE = ROOT / "data" / "seen_jobs.json"
 
 # At least one from each list must appear in the job title.
 SENIORITY = [
-    "senior", "sr.", "director", "head of", "vp ", "vp,", "vice president",
-    "principal", "lead",
+    "senior", "sr.", "lead",
 ]
 DOMAIN = [
     "design", "ux", "user experience", "product design",
